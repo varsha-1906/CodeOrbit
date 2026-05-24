@@ -272,3 +272,95 @@ hr {
 .current-user {
   border: 2px solid #38bdf8;
 }
+
+.leaderboard {
+  max-width: 600px;
+  margin: 40px auto;
+  background: #0f172a;
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.leaderboard h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #38bdf8;
+}
+
+.leaderboard-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  margin: 8px 0;
+  border-radius: 10px;
+  background: #1e293b;
+  transition: 0.2s;
+}
+
+.leaderboard-item:hover {
+  transform: scale(1.02);
+  background: #334155;
+}
+
+/* LEFT SIDE */
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rank {
+  width: 40px;
+  font-weight: bold;
+}
+
+/* Avatar circle */
+.avatar {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: black;
+}
+
+/* RIGHT SIDE */
+.right {
+  display: flex;
+  gap: 10px;
+  font-weight: bold;
+}
+
+.cf {
+  color: #f97316;
+}
+
+.lc {
+  color: #22c55e;
+}
+
+/* Highlight logged user */
+.current-user {
+  border: 2px solid #38bdf8;
+}
+
+.refresh-btn {
+  display: block;
+  margin: 10px auto 20px;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 8px;
+  background: #38bdf8;
+  color: black;
+  cursor: pointer;
+}
+
+.level {
+  font-size: 12px;
+  font-weight: bold;
+}

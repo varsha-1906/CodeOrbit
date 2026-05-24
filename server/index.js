@@ -159,7 +159,6 @@ app.get("/codeforces/:username", async (req, res) => {
 });
 
 // ================= LEETCODE =================
-
 app.get("/leetcode/:username", async (req, res) => {
   try {
     const username = req.params.username;
@@ -168,7 +167,7 @@ app.get("/leetcode/:username", async (req, res) => {
       "https://leetcode.com/graphql",
       {
         query: `
-        query getUserProfile($username: String!) {
+        query getUserData($username: String!) {
           matchedUser(username: $username) {
             submitStats {
               acSubmissionNum {
@@ -177,31 +176,50 @@ app.get("/leetcode/:username", async (req, res) => {
               }
             }
           }
+          userContestRanking(username: $username) {
+            rating
+            attendedContestsCount
+            globalRanking
+            totalParticipants
+            topPercentage
+          }
         }
         `,
         variables: { username }
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Referer: `https://leetcode.com/${username}/`
+        }
       }
     );
 
-    const data = response.data.data.matchedUser;
+    const data = response.data.data;
 
-    if (!data) {
-      return res.json({
-        total: 0,
-        easy: 0,
-        medium: 0,
-        hard: 0
-      });
-    }
+    // ✅ SOLVED STATS
+    const stats = data?.matchedUser?.submitStats?.acSubmissionNum || [];
 
-    const stats = data.submitStats.acSubmissionNum;
+    const total = stats.find(s => s.difficulty === "All")?.count || 0;
+    const easy = stats.find(s => s.difficulty === "Easy")?.count || 0;
+    const medium = stats.find(s => s.difficulty === "Medium")?.count || 0;
+    const hard = stats.find(s => s.difficulty === "Hard")?.count || 0;
 
-    res.json({
-      total: stats.find(s => s.difficulty === "All")?.count || 0,
-      easy: stats.find(s => s.difficulty === "Easy")?.count || 0,
-      medium: stats.find(s => s.difficulty === "Medium")?.count || 0,
-      hard: stats.find(s => s.difficulty === "Hard")?.count || 0
-    });
+    // ✅ CONTEST RATING
+    const ranking = data?.userContestRanking;
+
+    const result = {
+      total,
+      easy,
+      medium,
+      hard,
+      rating: ranking?.rating || 0,
+      globalRanking: ranking?.globalRanking || 0,
+      attendedContests: ranking?.attendedContestsCount || 0,
+      topPercentage: ranking?.topPercentage || 0
+    };
+
+    res.json(result);
 
   } catch (err) {
     console.log("LeetCode error:", err.message);
@@ -210,11 +228,14 @@ app.get("/leetcode/:username", async (req, res) => {
       total: 0,
       easy: 0,
       medium: 0,
-      hard: 0
+      hard: 0,
+      rating: 0,
+      globalRanking: 0,
+      attendedContests: 0,
+      topPercentage: 0
     });
   }
 });
-
 // ================= SERVER =================
 
 const PORT = process.env.PORT || 5000;

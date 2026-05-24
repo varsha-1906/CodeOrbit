@@ -11,6 +11,13 @@ function Dashboard() {
 
   const navigate = useNavigate();
 
+  // ✅ STEP 1: Level function
+  const getLevel = (score) => {
+    if (score < 1000) return "🟢 Beginner";
+    if (score < 2000) return "🟡 Intermediate";
+    return "🔴 Advanced";
+  };
+
   // 🔐 Fetch logged-in user
   const fetchUser = async () => {
     try {
@@ -54,7 +61,7 @@ function Dashboard() {
     }
   };
 
-  // 🏆 Leaderboard (FIXED)
+  // 🏆 Leaderboard
   const fetchLeaderboard = async () => {
     try {
       const res = await axios.get("http://localhost:5000/users");
@@ -68,7 +75,7 @@ function Dashboard() {
         let cfRating = 0;
         let lcScore = 0;
 
-        // 🔥 Codeforces
+        // CF
         if (u.codeforcesUsername) {
           try {
             await delay(400);
@@ -81,14 +88,15 @@ function Dashboard() {
           }
         }
 
-        // 🔥 LeetCode
+        // LC
         if (u.leetcodeUsername) {
           try {
             await delay(400);
             const lcRes = await axios.get(
               `http://localhost:5000/leetcode/${u.leetcodeUsername}`
             );
-            lcScore = lcRes.data.total || 0;
+            // lcScore = lcRes.data.total || 0;
+            lcScore = lcRes.data.rating || 0;
           } catch {
             lcScore = 0;
           }
@@ -152,33 +160,46 @@ function Dashboard() {
 
           {/* 💻 LC */}
           <h2>💻 LeetCode Stats</h2>
-          {lcData ? (
-            <div>
-              <p>🧩 Total: {lcData.total}</p>
-              <p style={{ color: "#22c55e" }}>Easy: {lcData.easy}</p>
-              <p style={{ color: "#facc15" }}>Medium: {lcData.medium}</p>
-              <p style={{ color: "#ef4444" }}>Hard: {lcData.hard}</p>
-            </div>
-          ) : (
-            <p>No LeetCode data</p>
-          )}
+     {/* <h2>💻 LeetCode Stats</h2> */}
+{lcData ? (
+  <div>
+    <p>🧩 Total: {lcData.total}</p>
+    <p style={{ color: "#22c55e" }}>Easy: {lcData.easy}</p>
+    <p style={{ color: "#facc15" }}>Medium: {lcData.medium}</p>
+    <p style={{ color: "#ef4444" }}>Hard: {lcData.hard}</p>
+
+    <hr />
+
+    <p>🏆 Rating: {lcData.rating}</p>
+    <p>📊 Contests: {lcData.contests}</p>
+    <p>🌍 Global Rank: {lcData.globalRank}</p>
+    <p>📉 Top %: {lcData.topPercentage}</p>
+  </div>
+) : (
+  <p>No LeetCode data</p>
+)}
         </div>
       ) : (
         <p>Loading user...</p>
       )}
 
+      {/* ✅ STEP 2: Refresh Button */}
+      <button onClick={fetchLeaderboard} className="refresh-btn">
+        🔄 Refresh
+      </button>
+
       {/* 🏆 LEADERBOARD */}
       <div className="leaderboard">
         <h2>🏆 Global Leaderboard</h2>
 
-        {leaderboard.length > 0 ? (
-          leaderboard.map((u, index) => (
-            <div
-              key={index}
-              className={`leaderboard-item ${
-                u.email === user?.email ? "current-user" : ""
-              }`}
-            >
+        {leaderboard.map((u, index) => (
+          <div
+            key={index}
+            className={`leaderboard-item ${
+              u.email === user?.email ? "current-user" : ""
+            }`}
+          >
+            <div className="left">
               <span className="rank">
                 {index === 0
                   ? "🥇"
@@ -189,16 +210,21 @@ function Dashboard() {
                   : `#${index + 1}`}
               </span>
 
-              <span className="name">{u.name}</span>
+              <div className="avatar">
+                {u.name?.charAt(0).toUpperCase()}
+              </div>
 
-              <span className="rating">
-                CF: {u.cfRating || 0} | LC: {u.lcScore || 0}
-              </span>
+              <span className="name">{u.name}</span>
             </div>
-          ))
-        ) : (
-          <p style={{ textAlign: "center" }}>Loading leaderboard...</p>
-        )}
+
+            {/* ✅ STEP 3: Level added */}
+            <div className="right">
+              <span className="cf">CF: {u.cfRating || 0}</span>
+              <span className="lc">LC: {u.lcScore || 0}</span>
+              <span className="level">{getLevel(u.rating)}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* 🔘 ACTIONS */}
