@@ -46,7 +46,16 @@ function App() {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
+   <div style={{ 
+  padding: "20px", 
+  background: "#0f172a", 
+  minHeight: "100vh",
+  color: "white"
+}}>
+  
+<h1 style={{ textAlign: "center" }}>
+  🚀 CodeOrbit Dashboard
+</h1>
       <h1>Users</h1>
 
       {/* Add User Form */}
@@ -113,19 +122,30 @@ function UserCard({ user }) {
   }, [user]);
 
   return (
-    <div style={{ marginBottom: "20px" }}>
-      <p>Name: {user.name}</p>
-      <p>Email: {user.email}</p>
-      <p>CF Username: {user.codeforcesUsername}</p>
+   
+  <div
+    style={{
+      background: "#1e1e2f",
+      color: "white",
+      padding: "15px",
+      borderRadius: "10px",
+      marginBottom: "15px",
+      boxShadow: "0 4px 10px rgba(0,0,0,0.3)"
+    }}
+  >
+    <h3>{user.name}</h3>
+    <p>Email: {user.email}</p>
+    <p>CF Username: {user.codeforcesUsername}</p>
 
-      {cfData && (
-        <div>
-          <p>Rating: {cfData.rating}</p>
-          <p>Rank: {cfData.rank}</p>
-        </div>
-      )}
+    {cfData ? (
+      <div>
+        <p>🔥 Rating: {cfData.rating}</p>
+        <p>🏆 Rank: {cfData.rank}</p>
+      </div>
+    ) : (
+      <p>Loading stats...</p>
+    )}
+  </div>
 
-      <hr />
-    </div>
   );
 }
