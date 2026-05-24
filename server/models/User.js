@@ -5,7 +5,9 @@ const userSchema = new mongoose.Schema({
   email: String,
   password: String,
   leetcodeUsername: String,
-  codeforcesUsername: String
+  codeforcesUsername: String,
+  weakTopics: [String],
+  futurePlans: String
 });
 
 module.exports = mongoose.model("User", userSchema);
