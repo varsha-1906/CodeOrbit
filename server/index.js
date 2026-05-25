@@ -1,4 +1,4 @@
-require("dotenv").config(); // ✅ ADD THIS
+require("dotenv").config(); // ✅ ENV
 
 const express = require("express");
 const mongoose = require("mongoose");
@@ -8,6 +8,9 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 const app = express();
+
+// 🧠 Cache
+const cache = {};
 
 // Middleware
 app.use(cors());
@@ -20,7 +23,7 @@ const auth = (req, res, next) => {
   if (!token) return res.status(401).send("No token");
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // ✅ FIX
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch {
@@ -28,9 +31,9 @@ const auth = (req, res, next) => {
   }
 };
 
-// ✅ MongoDB Connection (ENV)
+// ✅ MongoDB Connection
 mongoose
-  .connect(process.env.MONGO_URI) // ✅ FIX
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch((err) => console.log(err));
 
@@ -77,7 +80,7 @@ app.post("/login", async (req, res) => {
 
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET, // ✅ FIX
+      process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
@@ -133,6 +136,12 @@ app.put("/update-user", auth, async (req, res) => {
 app.get("/codeforces/:username", async (req, res) => {
   try {
     const username = req.params.username;
+    const key = `cf_${username}`;
+
+    // ✅ Cache check
+    if (cache[key]) {
+      return res.json(cache[key]);
+    }
 
     const response = await axios.get(
       `https://codeforces.com/api/user.info?handles=${username}`
@@ -146,10 +155,17 @@ app.get("/codeforces/:username", async (req, res) => {
       });
     }
 
-    res.json(response.data.result[0]);
-  } catch (err) {
-    console.log("CF ERROR:", err.message);
+    const result = response.data.result[0];
 
+    // ✅ Store cache
+    cache[key] = result;
+
+    // ⏱ Expire after 10 mins
+    setTimeout(() => delete cache[key], 10 * 60 * 1000);
+
+    res.json(result);
+
+  } catch (err) {
     res.json({
       rating: 0,
       rank: "error",
@@ -159,15 +175,22 @@ app.get("/codeforces/:username", async (req, res) => {
 });
 
 // ================= LEETCODE =================
+
 app.get("/leetcode/:username", async (req, res) => {
   try {
     const username = req.params.username;
+    const key = `lc_${username}`;
+
+    // ✅ Cache check
+    if (cache[key]) {
+      return res.json(cache[key]);
+    }
 
     const response = await axios.post(
       "https://leetcode.com/graphql",
       {
         query: `
-        query getUserData($username: String!) {
+        query getUserProfile($username: String!) {
           matchedUser(username: $username) {
             submitStats {
               acSubmissionNum {
@@ -178,52 +201,41 @@ app.get("/leetcode/:username", async (req, res) => {
           }
           userContestRanking(username: $username) {
             rating
-            attendedContestsCount
             globalRanking
-            totalParticipants
+            attendedContestsCount
             topPercentage
           }
         }
         `,
         variables: { username }
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Referer: `https://leetcode.com/${username}/`
-        }
       }
     );
 
-    const data = response.data.data;
+    const user = response.data.data.matchedUser;
+    const contest = response.data.data.userContestRanking;
 
-    // ✅ SOLVED STATS
-    const stats = data?.matchedUser?.submitStats?.acSubmissionNum || [];
-
-    const total = stats.find(s => s.difficulty === "All")?.count || 0;
-    const easy = stats.find(s => s.difficulty === "Easy")?.count || 0;
-    const medium = stats.find(s => s.difficulty === "Medium")?.count || 0;
-    const hard = stats.find(s => s.difficulty === "Hard")?.count || 0;
-
-    // ✅ CONTEST RATING
-    const ranking = data?.userContestRanking;
+    const stats = user?.submitStats?.acSubmissionNum || [];
 
     const result = {
-      total,
-      easy,
-      medium,
-      hard,
-      rating: ranking?.rating || 0,
-      globalRanking: ranking?.globalRanking || 0,
-      attendedContests: ranking?.attendedContestsCount || 0,
-      topPercentage: ranking?.topPercentage || 0
+      total: stats.find(s => s.difficulty === "All")?.count || 0,
+      easy: stats.find(s => s.difficulty === "Easy")?.count || 0,
+      medium: stats.find(s => s.difficulty === "Medium")?.count || 0,
+      hard: stats.find(s => s.difficulty === "Hard")?.count || 0,
+      rating: contest?.rating || 0,
+      globalRanking: contest?.globalRanking || 0,
+      contests: contest?.attendedContestsCount || 0,
+      topPercentage: contest?.topPercentage || 0
     };
+
+    // ✅ Store cache
+    cache[key] = result;
+
+    // ⏱ Expire after 10 mins
+    setTimeout(() => delete cache[key], 10 * 60 * 1000);
 
     res.json(result);
 
   } catch (err) {
-    console.log("LeetCode error:", err.message);
-
     res.json({
       total: 0,
       easy: 0,
@@ -231,11 +243,12 @@ app.get("/leetcode/:username", async (req, res) => {
       hard: 0,
       rating: 0,
       globalRanking: 0,
-      attendedContests: 0,
+      contests: 0,
       topPercentage: 0
     });
   }
 });
+
 // ================= SERVER =================
 
 const PORT = process.env.PORT || 5000;
