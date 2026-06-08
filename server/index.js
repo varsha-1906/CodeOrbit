@@ -6,6 +6,7 @@ const cors = require("cors");
 const axios = require("axios");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const StatHistory = require("./models/StatHistory");
 
 const app = express();
 
@@ -39,6 +40,7 @@ mongoose
 
 // User Model
 const User = require("./models/User");
+require("./cron/updateStats");
 
 // ================= AUTH =================
 
@@ -93,10 +95,32 @@ app.post("/login", async (req, res) => {
 // ================= USER =================
 
 // 🏆 Get ALL users
+// 🏆 Get ALL users
 app.get("/users", async (req, res) => {
   try {
     const users = await User.find().select("-password");
-    res.json(users);
+
+    const leaderboard = users.map((u) => ({
+      name: u.name,
+      email: u.email,
+
+      cfRating: u.cfRating || 0,
+      cfMax: u.cfMaxRating || 0,
+      cfRank: u.cfRank || "unrated",
+
+      lcScore: u.lcRating || 0,
+      lcTotal: u.lcSolved || 0,
+      lcContests: u.lcContests || 0,
+
+      rating: (u.cfRating || 0) + (u.lcRating || 0),
+
+      lastUpdated: u.lastUpdated
+    }));
+
+    leaderboard.sort((a, b) => b.rating - a.rating);
+
+    res.json(leaderboard);
+
   } catch (err) {
     res.status(500).send(err);
   }

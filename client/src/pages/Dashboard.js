@@ -27,85 +27,56 @@ function Dashboard() {
     return "🔴 Advanced";
   };
 
-  // 🔐 Fetch user
-  const fetchUser = async () => {
-    try {
-      const token = localStorage.getItem("token");
+const fetchUser = async () => {
+  try {
+    const token = localStorage.getItem("token");
 
-      const res = await axios.get("http://localhost:5000/me", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+    const res = await axios.get("http://localhost:5000/me", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
-      const currentUser = res.data;
-      setUser(currentUser);
+    const currentUser = res.data;
 
-      if (currentUser?.codeforcesUsername) {
-        const cfRes = await axios.get(
-          `http://localhost:5000/codeforces/${currentUser.codeforcesUsername}`
-        );
-        setCfData(cfRes.data);
-      }
+    setUser(currentUser);
 
-      if (currentUser?.leetcodeUsername) {
-        const lcRes = await axios.get(
-          `http://localhost:5000/leetcode/${currentUser.leetcodeUsername}`
-        );
-        setLcData(lcRes.data);
-      }
+    setCfData({
+      rating: currentUser.cfRating || 0,
+      maxRating: currentUser.cfMaxRating || 0,
+      rank: currentUser.cfRank || "unrated"
+    });
 
-    } catch (err) {
-      console.log(err);
-    }
-  };
+    setLcData({
+      total: currentUser.lcSolved || 0,
+      easy: currentUser.lcEasy || 0,
+      medium: currentUser.lcMedium || 0,
+      hard: currentUser.lcHard || 0,
 
-  // 🏆 Leaderboard
-  const fetchLeaderboard = async () => {
-    try {
-      setLoading(true);
+      rating: currentUser.lcRating || 0,
+      contests: currentUser.lcContests || 0,
 
-      const res = await axios.get("http://localhost:5000/users");
-      const users = res.data;
+      globalRanking: currentUser.lcGlobalRanking || 0,
+      topPercentage: currentUser.lcTopPercentage || 0
+    });
 
-      const updatedUsers = await Promise.all(
-        users.map(async (u) => {
-          let cfRating = 0;
-          let lcScore = 0;
+  } catch (err) {
+    console.log(err);
+  }
+};
 
-          if (u.codeforcesUsername) {
-            try {
-              const cfRes = await axios.get(
-                `http://localhost:5000/codeforces/${u.codeforcesUsername}`
-              );
-              cfRating = cfRes.data.rating || 0;
-            } catch {}
-          }
+const fetchLeaderboard = async () => {
+  try {
+    setLoading(true);
 
-          if (u.leetcodeUsername) {
-            try {
-              const lcRes = await axios.get(
-                `http://localhost:5000/leetcode/${u.leetcodeUsername}`
-              );
-              lcScore = lcRes.data.rating || 0;
-            } catch {}
-          }
+    const res = await axios.get("http://localhost:5000/users");
 
-          return {
-            ...u,
-            rating: cfRating + lcScore,
-            cfRating,
-            lcScore
-          };
-        })
-      );
+    setLeaderboard(res.data);
 
-      setLeaderboard(updatedUsers);
-      setLoading(false);
-
-    } catch (err) {
-      console.log(err);
-      setLoading(false);
-    }
-  };
+    setLoading(false);
+  } catch (err) {
+    console.log(err);
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchUser();
