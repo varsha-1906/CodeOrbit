@@ -118,6 +118,29 @@ const fetchLeaderboard = async () => {
   return (
     <div className="dashboard-container">
       <h1>🌌 CodeOrbit Dashboard</h1>
+      {user && cfData && lcData && (
+  <div className="stats-grid">
+    <div className="stat-card">
+      <h3>📊 CF Rating</h3>
+      <p>{cfData.rating}</p>
+    </div>
+
+    <div className="stat-card">
+      <h3>💻 LC Rating</h3>
+      <p>{Math.round(lcData.rating)}</p>
+    </div>
+
+    <div className="stat-card">
+      <h3>🧩 Solved</h3>
+      <p>{lcData.total}</p>
+    </div>
+
+    <div className="stat-card">
+      <h3>🏆 Contests</h3>
+      <p>{lcData.contests}</p>
+    </div>
+  </div>
+)}
 
       {/* ⚠️ Profile Warning */}
       {user && (!user.codeforcesUsername || !user.leetcodeUsername) && (
@@ -134,6 +157,12 @@ const fetchLeaderboard = async () => {
           <p><b>Email:</b> {user.email}</p>
           <p><b>Codeforces:</b> {user.codeforcesUsername}</p>
           <p><b>LeetCode:</b> {user.leetcodeUsername}</p>
+          <p>
+  🕒 Last Updated:
+  {user.lastUpdated
+    ? new Date(user.lastUpdated).toLocaleString()
+    : "Never"}
+</p>
 
           <hr />
 

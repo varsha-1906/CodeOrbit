@@ -273,6 +273,18 @@ app.get("/leetcode/:username", async (req, res) => {
   }
 });
 
+// 📈 Get user rating history
+app.get("/history/:userId", async (req, res) => {
+  try {
+    const history = await StatHistory.find({
+      userId: req.params.userId
+    }).sort({ timestamp: 1 });
+
+    res.json(history);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
 // ================= SERVER =================
 
 const PORT = process.env.PORT || 5000;
