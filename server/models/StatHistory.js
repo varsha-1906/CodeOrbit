@@ -16,6 +16,16 @@ const statHistorySchema = new mongoose.Schema({
     default: 0
   },
 
+  lcSolved: {
+    type: Number,
+    default: 0
+  },
+
+  cfSolved: {
+    type: Number,
+    default: 0
+  },
+
   timestamp: {
     type: Date,
     default: Date.now

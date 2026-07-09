@@ -15,6 +15,11 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
 
+  cfSolved: {
+    type: Number,
+    default: 0
+  },
+
   cfMaxRating: {
     type: Number,
     default: 0

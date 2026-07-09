@@ -7,6 +7,8 @@ const axios = require("axios");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const StatHistory = require("./models/StatHistory");
+const LeetCodeProblem = require("./models/LeetCodeProblem");
+const calculateInterviewReadiness = require("./utils/readinessEngine");
 
 const app = express();
 
@@ -285,6 +287,162 @@ app.get("/history/:userId", async (req, res) => {
     res.status(500).send(err);
   }
 });
+
+// 🚀 ADVANCED AI INTERVIEW READINESS ENDPOINT
+app.get("/ai/interview-readiness/:username", async (req, res) => {
+  try {
+    const username = req.params.username;
+    
+    // Find user by either LC username, CF username, or name (case-insensitive)
+    let user = await User.findOne({
+      $or: [
+        { leetcodeUsername: { $regex: new RegExp(`^${username}$`, "i") } },
+        { codeforcesUsername: { $regex: new RegExp(`^${username}$`, "i") } }
+      ]
+    });
+    
+    if (!user) {
+      user = await User.findOne({ name: { $regex: new RegExp(`^${username}$`, "i") } });
+    }
+    
+    // Fallback for development if no user matches
+    if (!user) {
+      user = await User.findOne();
+    }
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const history = await StatHistory.find({ userId: user._id }).sort({ timestamp: 1 });
+
+    // Fetch LeetCode and Codeforces data with cache and fallbacks
+    const fetchedData = {
+      leetcodeSolvedProblems: [],
+      leetcodeCalendar: {},
+      leetcodeContests: {},
+      codeforcesSolvedProblems: [],
+      codeforcesContests: []
+    };
+
+    // 1. Fetch LeetCode Solved List & Cache Problem Details
+    if (user.leetcodeUsername) {
+      try {
+        const solvedRes = await axios.get(
+          `https://leetcode-api-pied.vercel.app/user/${user.leetcodeUsername}/solved`
+        );
+        const solvedSlugs = solvedRes.data?.solved_slugs || [];
+        
+        if (solvedSlugs.length > 0) {
+          // Get already cached problems
+          const cachedProblems = await LeetCodeProblem.find({
+            titleSlug: { $in: solvedSlugs }
+          });
+          const cachedMap = new Map(cachedProblems.map(p => [p.titleSlug, p]));
+          
+          const missingSlugs = solvedSlugs.filter(slug => !cachedMap.has(slug));
+          
+          // Fetch and cache missing problems (limit to max 30 per request to avoid timeout/rate limits)
+          const fetchBatch = missingSlugs.slice(0, 30);
+          const fetchedBatchProblems = [];
+          
+          if (fetchBatch.length > 0) {
+            await Promise.all(
+              fetchBatch.map(async (slug) => {
+                try {
+                  const probRes = await axios.get(
+                    `https://leetcode-api-pied.vercel.app/problem/${slug}`
+                  );
+                  if (probRes.data && probRes.data.title) {
+                    const tags = (probRes.data.topicTags || []).map(t => t.name || t);
+                    const newProb = await LeetCodeProblem.create({
+                      titleSlug: slug,
+                      title: probRes.data.title,
+                      difficulty: probRes.data.difficulty || "Easy",
+                      topicTags: tags,
+                      isPaidOnly: probRes.data.isPaidOnly || false,
+                      likes: probRes.data.likes || 0,
+                      dislikes: probRes.data.dislikes || 0,
+                      lastUpdated: new Date()
+                    });
+                    fetchedBatchProblems.push(newProb);
+                  }
+                } catch (e) {
+                  // Suppress individual failures
+                }
+              })
+            );
+          }
+          
+          // Combine cached and fetched
+          const allProblemsList = [...cachedProblems, ...fetchedBatchProblems];
+          fetchedData.leetcodeSolvedProblems = allProblemsList;
+        }
+      } catch (err) {
+        console.log("Error fetching LeetCode solved list:", err.message);
+      }
+
+      // 2. Fetch LeetCode Calendar
+      try {
+        const calendarRes = await axios.get(
+          `https://leetcode-api-pied.vercel.app/user/${user.leetcodeUsername}/calendar`
+        );
+        fetchedData.leetcodeCalendar = calendarRes.data || {};
+      } catch (err) {
+        console.log("Error fetching LeetCode calendar:", err.message);
+      }
+
+      // 3. Fetch LeetCode Contests
+      try {
+        const contestsRes = await axios.get(
+          `https://leetcode-api-pied.vercel.app/user/${user.leetcodeUsername}/contests`
+        );
+        fetchedData.leetcodeContests = contestsRes.data || {};
+      } catch (err) {
+        console.log("Error fetching LeetCode contests:", err.message);
+      }
+    }
+
+    // 4. Fetch Codeforces Status & Rating History
+    if (user.codeforcesUsername) {
+      try {
+        const cfStatusRes = await axios.get(
+          `https://codeforces.com/api/user.status?handle=${user.codeforcesUsername}`
+        );
+        if (cfStatusRes.data && cfStatusRes.data.status === "OK") {
+          fetchedData.codeforcesSolvedProblems = cfStatusRes.data.result
+            .filter(sub => sub.verdict === "OK" && sub.problem)
+            .map(sub => ({
+              name: sub.problem.name,
+              rating: sub.problem.rating || 0,
+              tags: sub.problem.tags || [],
+              timestamp: sub.creationTimeSeconds
+            }));
+        }
+      } catch (err) {
+        console.log("Error fetching Codeforces status:", err.message);
+      }
+
+      try {
+        const cfRatingRes = await axios.get(
+          `https://codeforces.com/api/user.rating?handle=${user.codeforcesUsername}`
+        );
+        if (cfRatingRes.data && cfRatingRes.data.status === "OK") {
+          fetchedData.codeforcesContests = cfRatingRes.data.result || [];
+        }
+      } catch (err) {
+        console.log("Error fetching Codeforces rating history:", err.message);
+      }
+    }
+
+    const report = calculateInterviewReadiness(user, history, fetchedData);
+    
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ================= SERVER =================
 
 const PORT = process.env.PORT || 5000;

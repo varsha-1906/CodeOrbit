@@ -2,8 +2,9 @@
 body {
   margin: 0;
   font-family: 'Segoe UI', sans-serif;
-  background: linear-gradient(to right, #0f172a, #1e293b);
-  color: white;
+  background: var(--bg-gradient);
+  color: var(--text-color);
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* Inputs */
@@ -14,8 +15,9 @@ input {
   border-radius: 8px;
   border: none;
   outline: none;
-  background: #334155;
-  color: white;
+  background: var(--input-bg);
+  color: var(--input-color);
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* Buttons */
@@ -23,13 +25,13 @@ button {
   padding: 10px 18px;
   border-radius: 8px;
   border: none;
-  background: #38bdf8;
+  background: var(--primary-color);
   color: white;
   font-weight: bold;
   cursor: pointer;
-  transition: 0.3s;
+  transition: background 0.3s ease, transform 0.2s ease;
 }
 
 button:hover {
-  background: #0ea5e9;
-}
+  background: var(--primary-hover);
+}
