@@ -5,10 +5,10 @@ import "../App.css";
 
 // ✅ CHART IMPORTS
 import { Pie, Doughnut, Radar, Bar, Line } from "react-chartjs-2";
-import { 
-  Chart as ChartJS, 
-  ArcElement, 
-  Tooltip, 
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
   Legend,
   RadialLinearScale,
   PointElement,
@@ -20,8 +20,8 @@ import {
 } from "chart.js";
 
 ChartJS.register(
-  ArcElement, 
-  Tooltip, 
+  ArcElement,
+  Tooltip,
   Legend,
   RadialLinearScale,
   PointElement,
@@ -49,6 +49,12 @@ function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [readinessReport, setReadinessReport] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  
+  // Topic Breakdown table states
+  const [topicSearch, setTopicSearch] = useState("");
+  const [topicSortColumn, setTopicSortColumn] = useState("total");
+  const [topicSortDirection, setTopicSortDirection] = useState("desc");
 
   const navigate = useNavigate();
 
@@ -67,7 +73,8 @@ function Dashboard() {
       setCfData({
         rating: currentUser.cfRating || 0,
         maxRating: currentUser.cfMaxRating || 0,
-        rank: currentUser.cfRank || "unrated"
+        rank: currentUser.cfRank || "unrated",
+        solved: currentUser.cfSolved || 0
       });
 
       setLcData({
@@ -88,6 +95,16 @@ function Dashboard() {
       if (username) {
         const readinessRes = await axios.get(`http://localhost:5000/ai/interview-readiness/${username}`);
         setReadinessReport(readinessRes.data);
+      }
+
+      // Fetch historical stats for CF Rating trend graph
+      if (currentUser._id) {
+        try {
+          const historyRes = await axios.get(`http://localhost:5000/history/${currentUser._id}`);
+          setHistoryData(historyRes.data || []);
+        } catch (e) {
+          console.log("Error fetching history:", e);
+        }
       }
 
     } catch (err) {
@@ -145,6 +162,41 @@ function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     navigate("/");
+  };
+
+  const handleTopicSort = (col) => {
+    if (topicSortColumn === col) {
+      setTopicSortDirection(topicSortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setTopicSortColumn(col);
+      setTopicSortDirection("desc");
+    }
+  };
+
+  const renderSortIcon = (col) => {
+    if (topicSortColumn !== col) return null;
+    return <span className="sort-icon">{topicSortDirection === "asc" ? "▲" : "▼"}</span>;
+  };
+
+  const getSortedTopicsDetail = () => {
+    if (!readinessReport || !readinessReport.topicsDetail) return [];
+    
+    return [...readinessReport.topicsDetail]
+      .filter((t) => t.topic.toLowerCase().includes(topicSearch.toLowerCase()))
+      .sort((a, b) => {
+        let valA = a[topicSortColumn] || 0;
+        let valB = b[topicSortColumn] || 0;
+        
+        if (topicSortColumn === "topic") {
+          return topicSortDirection === "asc"
+            ? (a.topic || "").localeCompare(b.topic || "")
+            : (b.topic || "").localeCompare(a.topic || "");
+        }
+        
+        return topicSortDirection === "asc"
+          ? valA - valB
+          : valB - valA;
+      });
   };
 
   return (
@@ -221,6 +273,37 @@ function Dashboard() {
                 <p>🔥 Rating: {cfData.rating}</p>
                 <p>🏆 Rank: {cfData.rank}</p>
                 <p>📈 Max Rating: {cfData.maxRating}</p>
+                <p>🧩 Solved: {cfData.solved || 0}</p>
+
+                <h3>📈 Rating History</h3>
+                <div style={{ width: "100%", maxWidth: "450px", margin: "15px auto" }}>
+                  {historyData && historyData.filter(h => h.cfRating > 0).length > 0 ? (
+                    <Line 
+                      data={{
+                        labels: historyData.filter(h => h.cfRating > 0).map(h => new Date(h.timestamp).toLocaleDateString()),
+                        datasets: [
+                          {
+                            label: "Rating",
+                            data: historyData.filter(h => h.cfRating > 0).map(h => h.cfRating),
+                            borderColor: "#3b82f6",
+                            backgroundColor: "rgba(59, 130, 246, 0.1)",
+                            fill: true,
+                            tension: 0.2
+                          }
+                        ]
+                      }}
+                      options={{
+                        scales: {
+                          x: { grid: { display: false }, ticks: { color: textMuted, font: { size: 9 } } },
+                          y: { grid: { color: gridColor }, ticks: { color: textColor } }
+                        },
+                        plugins: { legend: { display: false } }
+                      }}
+                    />
+                  ) : (
+                    <p style={{ color: textMuted, fontStyle: "italic", fontSize: "13px" }}>No rating history recorded yet.</p>
+                  )}
+                </div>
               </div>
             ) : <p>No CF data</p>}
 
@@ -299,14 +382,14 @@ function Dashboard() {
                       <div className="diagnostic-col">
                         <h4>✔ Strengths</h4>
                         <ul className="diagnostic-list">
-                          {readinessReport.recommendations && 
-                           (readinessReport.components?.topicMastery > 50 ? ["Concept Mastery", "Coding Base"] : ["Starting foundations"]).concat(
-                             readinessReport.components?.consistency > 50 ? ["Consistency"] : []
-                           ).map((str, idx) => (
-                            <li key={idx} className="strength-item">
-                              <span className="icon">✔</span> {str}
-                            </li>
-                          ))}
+                          {readinessReport.recommendations &&
+                            (readinessReport.components?.topicMastery > 50 ? ["Concept Mastery", "Coding Base"] : ["Starting foundations"]).concat(
+                              readinessReport.components?.consistency > 50 ? ["Consistency"] : []
+                            ).map((str, idx) => (
+                              <li key={idx} className="strength-item">
+                                <span className="icon">✔</span> {str}
+                              </li>
+                            ))}
                         </ul>
                       </div>
                       <div className="diagnostic-col">
@@ -324,15 +407,107 @@ function Dashboard() {
                 </div>
               </div>
 
+              {/* 📋 Topic Breakdown Summary Table */}
+              <div className="dashboard-card topic-breakdown-card">
+                <div className="topic-search-bar">
+                  <h2>📋 Topic Breakdown Summary</h2>
+                  <input
+                    type="text"
+                    placeholder="Search topics..."
+                    value={topicSearch}
+                    onChange={(e) => setTopicSearch(e.target.value)}
+                  />
+                </div>
+                
+                <div className="topic-table-container">
+                  <table className="topic-table">
+                    <thead>
+                      <tr>
+                        <th onClick={() => handleTopicSort("topic")}>Topic {renderSortIcon("topic")}</th>
+                        <th onClick={() => handleTopicSort("easy")} style={{ textAlign: "center" }}>Easy {renderSortIcon("easy")}</th>
+                        <th onClick={() => handleTopicSort("medium")} style={{ textAlign: "center" }}>Medium {renderSortIcon("medium")}</th>
+                        <th onClick={() => handleTopicSort("hard")} style={{ textAlign: "center" }}>Hard {renderSortIcon("hard")}</th>
+                        <th onClick={() => handleTopicSort("total")} style={{ textAlign: "center" }}>Total Solved {renderSortIcon("total")}</th>
+                        <th onClick={() => handleTopicSort("mastery")}>Concept Mastery {renderSortIcon("mastery")}</th>
+                        <th onClick={() => handleTopicSort("score")} style={{ textAlign: "center" }}>Contribution Score {renderSortIcon("score")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getSortedTopicsDetail().map((row, index) => (
+                        <tr key={index}>
+                          <td><b>{row.topic}</b></td>
+                          <td className="easy-count" style={{ textAlign: "center" }}>{row.easy || 0}</td>
+                          <td className="medium-count" style={{ textAlign: "center" }}>{row.medium || 0}</td>
+                          <td className="hard-count" style={{ textAlign: "center" }}>{row.hard || 0}</td>
+                          <td className="total-count" style={{ textAlign: "center" }}>{row.total || 0}</td>
+                          <td>
+                            <div className="mastery-bar-container">
+                              <span className="mastery-percent">{row.mastery || 0}%</span>
+                              <div className="mastery-bar">
+                                <div className="mastery-fill" style={{ width: `${row.mastery || 0}%` }}></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="score-value" style={{ textAlign: "center" }}>{row.score || 0}</td>
+                        </tr>
+                      ))}
+                      
+                      {/* Summary Row */}
+                      {readinessReport.topicsDetail && (
+                        <tr className="topic-table-summary">
+                          <td>Total Summary</td>
+                          <td style={{ textAlign: "center" }}>
+                            {readinessReport.topicsDetail.reduce((sum, r) => sum + (r.easy || 0), 0)}
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            {readinessReport.topicsDetail.reduce((sum, r) => sum + (r.medium || 0), 0)}
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            {readinessReport.topicsDetail.reduce((sum, r) => sum + (r.hard || 0), 0)}
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            {readinessReport.topicsDetail.reduce((sum, r) => sum + (r.total || 0), 0)}
+                          </td>
+                          <td>
+                            <div className="mastery-bar-container">
+                              <span className="mastery-percent">
+                                {Math.round(
+                                  readinessReport.topicsDetail.reduce((sum, r) => sum + (r.mastery || 0), 0) /
+                                  readinessReport.topicsDetail.length
+                                )}%
+                              </span>
+                              <div className="mastery-bar">
+                                <div
+                                  className="mastery-fill"
+                                  style={{
+                                    width: `${Math.round(
+                                      readinessReport.topicsDetail.reduce((sum, r) => sum + (r.mastery || 0), 0) /
+                                      readinessReport.topicsDetail.length
+                                    )}%`
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            {Math.round(readinessReport.topicsDetail.reduce((sum, r) => sum + (r.score || 0), 0))}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               {/* 📊 8 Visualizations Grid */}
               <div className="readiness-charts-grid">
-                
+
                 {/* 1. Concept Mastery Radar Chart */}
                 <div className="chart-card">
                   <h3>🕸 Topic Mastery Overview</h3>
                   <div className="chart-wrapper" style={{ width: "280px", height: "280px" }}>
-                    <Radar 
-                      data={readinessReport.charts.radar} 
+                    <Radar
+                      data={readinessReport.charts.radar}
                       options={{
                         scales: {
                           r: {
@@ -352,8 +527,8 @@ function Dashboard() {
                 <div className="chart-card">
                   <h3>📊 Topic Weight Contributions</h3>
                   <div className="chart-wrapper">
-                    <Bar 
-                      data={readinessReport.charts.bar} 
+                    <Bar
+                      data={readinessReport.charts.bar}
                       options={{
                         scales: {
                           x: { grid: { display: false }, ticks: { color: textColor, font: { size: 9 } } },
@@ -377,8 +552,8 @@ function Dashboard() {
                 <div className="chart-card">
                   <h3>📈 Readiness Score Trend</h3>
                   <div className="chart-wrapper">
-                    <Line 
-                      data={readinessReport.charts.line} 
+                    <Line
+                      data={readinessReport.charts.line}
                       options={{
                         scales: {
                           x: { grid: { display: false }, ticks: { color: textMuted, font: { size: 9 } } },
@@ -393,7 +568,7 @@ function Dashboard() {
                 <div className="chart-card">
                   <h3>⚔ Codeforces vs LeetCode</h3>
                   <div className="chart-wrapper">
-                    <Bar 
+                    <Bar
                       data={{
                         labels: readinessReport.charts.cfVsLc.platforms,
                         datasets: [
@@ -427,7 +602,7 @@ function Dashboard() {
                   </p>
                   <div className="heatmap-container">
                     {readinessReport.charts.heatmap.map((cell, idx) => (
-                      <div 
+                      <div
                         key={idx}
                         className="heatmap-day"
                         title={`${cell.date}: ${cell.count ? "Active Coding Record" : "No Activity"}`}
@@ -451,14 +626,14 @@ function Dashboard() {
                 <div className="chart-card">
                   <h3>💎 Readiness Components Breakdown</h3>
                   <div className="chart-wrapper" style={{ width: "240px", height: "240px" }}>
-                    <Radar 
+                    <Radar
                       data={{
                         labels: [
-                          "Topic Mastery", 
-                          "Difficulty Coverage", 
-                          "Codeforces Strength", 
-                          "Consistency", 
-                          "Growth", 
+                          "Topic Mastery",
+                          "Difficulty Coverage",
+                          "Codeforces Strength",
+                          "Consistency",
+                          "Growth",
                           "Contest Performance"
                         ],
                         datasets: [{
@@ -495,7 +670,7 @@ function Dashboard() {
                 <div className="chart-card">
                   <h3>🎯 Target Progress Metrics</h3>
                   <div className="chart-wrapper">
-                    <Bar 
+                    <Bar
                       data={{
                         labels: ["Easy Target", "Medium Target", "Hard Target"],
                         datasets: [

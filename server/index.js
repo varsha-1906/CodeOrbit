@@ -292,7 +292,7 @@ app.get("/history/:userId", async (req, res) => {
 app.get("/ai/interview-readiness/:username", async (req, res) => {
   try {
     const username = req.params.username;
-    
+
     // Find user by either LC username, CF username, or name (case-insensitive)
     let user = await User.findOne({
       $or: [
@@ -300,16 +300,16 @@ app.get("/ai/interview-readiness/:username", async (req, res) => {
         { codeforcesUsername: { $regex: new RegExp(`^${username}$`, "i") } }
       ]
     });
-    
+
     if (!user) {
       user = await User.findOne({ name: { $regex: new RegExp(`^${username}$`, "i") } });
     }
-    
+
     // Fallback for development if no user matches
     if (!user) {
       user = await User.findOne();
     }
-    
+
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -332,20 +332,20 @@ app.get("/ai/interview-readiness/:username", async (req, res) => {
           `https://leetcode-api-pied.vercel.app/user/${user.leetcodeUsername}/solved`
         );
         const solvedSlugs = solvedRes.data?.solved_slugs || [];
-        
+
         if (solvedSlugs.length > 0) {
           // Get already cached problems
           const cachedProblems = await LeetCodeProblem.find({
             titleSlug: { $in: solvedSlugs }
           });
           const cachedMap = new Map(cachedProblems.map(p => [p.titleSlug, p]));
-          
+
           const missingSlugs = solvedSlugs.filter(slug => !cachedMap.has(slug));
-          
+
           // Fetch and cache missing problems (limit to max 30 per request to avoid timeout/rate limits)
           const fetchBatch = missingSlugs.slice(0, 30);
           const fetchedBatchProblems = [];
-          
+
           if (fetchBatch.length > 0) {
             await Promise.all(
               fetchBatch.map(async (slug) => {
@@ -373,7 +373,7 @@ app.get("/ai/interview-readiness/:username", async (req, res) => {
               })
             );
           }
-          
+
           // Combine cached and fetched
           const allProblemsList = [...cachedProblems, ...fetchedBatchProblems];
           fetchedData.leetcodeSolvedProblems = allProblemsList;
@@ -436,7 +436,7 @@ app.get("/ai/interview-readiness/:username", async (req, res) => {
     }
 
     const report = calculateInterviewReadiness(user, history, fetchedData);
-    
+
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -9,7 +9,7 @@ const config = require("../config/readinessConfig");
 function mapTagToConfigKey(rawTag) {
   if (!rawTag) return null;
   const tag = rawTag.toLowerCase().trim();
-  
+
   if (tag === "array" || tag === "arrays" || tag === "matrix" || tag === "prefix sum" || tag === "simulation" || tag === "sorting") {
     return "Arrays";
   }
@@ -82,7 +82,7 @@ function mapTagToConfigKey(rawTag) {
   if (tag === "network flow" || tag === "network-flow" || tag === "max flow" || tag === "bipartite matching") {
     return "Network Flow";
   }
-  
+
   return null;
 }
 
@@ -130,13 +130,18 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
     topicSolvedCounts[t] = { Easy: 0, Medium: 0, Hard: 0 };
   });
 
-  let hasRealSolvedData = false;
+  let categorizedEasy = 0;
+  let categorizedMedium = 0;
+  let categorizedHard = 0;
 
   // Process real LeetCode solved problems
   if (leetcodeSolvedProblems && leetcodeSolvedProblems.length > 0) {
-    hasRealSolvedData = true;
     leetcodeSolvedProblems.forEach(prob => {
       const difficulty = prob.difficulty || "Easy";
+      if (difficulty === "Easy") categorizedEasy++;
+      else if (difficulty === "Medium") categorizedMedium++;
+      else if (difficulty === "Hard") categorizedHard++;
+
       const tags = prob.topicTags || [];
       tags.forEach(tag => {
         const configKey = mapTagToConfigKey(tag);
@@ -149,7 +154,6 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
 
   // Process real Codeforces solved problems
   if (codeforcesSolvedProblems && codeforcesSolvedProblems.length > 0) {
-    hasRealSolvedData = true;
     codeforcesSolvedProblems.forEach(prob => {
       const difficulty = mapCfRatingToDifficulty(prob.rating);
       const tags = prob.tags || [];
@@ -162,45 +166,43 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
     });
   }
 
-  // Fallback: If no real solved problem detail was successfully fetched, use deterministic simulation based on user totals
-  if (!hasRealSolvedData) {
-    let easyLeft = lcEasy;
-    let mediumLeft = lcMedium;
-    let hardLeft = lcHard;
+  // Distribute remaining (un-categorized/uncached) LeetCode solved problems to align with actual totals
+  const remainingEasy = Math.max(0, lcEasy - categorizedEasy);
+  const remainingMedium = Math.max(0, lcMedium - categorizedMedium);
+  const remainingHard = Math.max(0, lcHard - categorizedHard);
 
-    // Easy distribution topics
+  if (remainingEasy > 0) {
     const easyTopics = ["Arrays", "Strings", "Linked List", "Hash Map", "Stack", "Queue", "Two Pointers"];
     let idx = 0;
-    while (easyLeft > 0) {
+    for (let i = 0; i < remainingEasy; i++) {
       const topic = easyTopics[idx % easyTopics.length];
       topicSolvedCounts[topic].Easy++;
-      easyLeft--;
       idx++;
     }
+  }
 
-    // Medium distribution topics
+  if (remainingMedium > 0) {
     const mediumTopics = [
-      "Binary Search", "Trees", "BST", "DFS", "BFS", "Stack", "Queue", 
+      "Binary Search", "Trees", "BST", "DFS", "BFS", "Stack", "Queue",
       "Dynamic Programming", "Greedy", "Heap", "Two Pointers", "Hash Map"
     ];
-    idx = 0;
-    while (mediumLeft > 0) {
+    let idx = 0;
+    for (let i = 0; i < remainingMedium; i++) {
       const topic = mediumTopics[idx % mediumTopics.length];
       topicSolvedCounts[topic].Medium++;
-      mediumLeft--;
       idx++;
     }
+  }
 
-    // Hard distribution topics
+  if (remainingHard > 0) {
     const hardTopics = [
-      "Dynamic Programming", "Graphs", "Backtracking", "Trie", "Union Find", 
+      "Dynamic Programming", "Graphs", "Backtracking", "Trie", "Union Find",
       "Segment Tree", "Fenwick Tree", "Bitmask", "Geometry", "Network Flow"
     ];
-    idx = 0;
-    while (hardLeft > 0) {
+    let idx = 0;
+    for (let i = 0; i < remainingHard; i++) {
       const topic = hardTopics[idx % hardTopics.length];
       topicSolvedCounts[topic].Hard++;
-      hardLeft--;
       idx++;
     }
   }
@@ -213,9 +215,9 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
   topics.forEach(topic => {
     const counts = topicSolvedCounts[topic];
     const weight = config.topicWeights[topic] || 3;
-    
+
     // Formula: Topic Score = Topic Weight * Difficulty Weight
-    const score = 
+    const score =
       counts.Easy * weight * config.difficultyWeights.Easy +
       counts.Medium * weight * config.difficultyWeights.Medium +
       counts.Hard * weight * config.difficultyWeights.Hard;
@@ -245,10 +247,10 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
   // ==========================================
   const cfRatingNormalized = Math.min((cfRating / config.codeforcesTargets.targetRating) * 100, 100);
   const cfMaxRatingNormalized = Math.min((cfMaxRating / config.codeforcesTargets.targetMaxRating) * 100, 100);
-  
+
   // Contest participation
-  const cfContestCount = codeforcesContests && codeforcesContests.length > 0 
-    ? codeforcesContests.length 
+  const cfContestCount = codeforcesContests && codeforcesContests.length > 0
+    ? codeforcesContests.length
     : (cfRating > 0 ? Math.max(5, Math.floor((cfRating - 800) / 25)) : 0);
   const cfContestNormalized = Math.min((cfContestCount / config.codeforcesTargets.targetContests) * 100, 100);
 
@@ -278,7 +280,7 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
   const oneDay = 24 * 60 * 60 * 1000;
 
   const activeDates = new Set();
-  
+
   // Parse LeetCode submission calendar
   if (leetcodeCalendar && leetcodeCalendar.submissionCalendar) {
     Object.keys(leetcodeCalendar.submissionCalendar).forEach(ts => {
@@ -344,8 +346,8 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
   const streakScore = Math.min((finalStreak / config.consistencyTargets.targetStreak) * 100, 100);
 
   const consistencyScore = Math.round(
-    0.40 * weeklyScore + 
-    0.30 * monthlyScore + 
+    0.40 * weeklyScore +
+    0.30 * monthlyScore +
     0.30 * streakScore
   );
 
@@ -366,13 +368,13 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
   }
 
   const ratingImprovementScore = Math.min(((cfGrowth + lcGrowth) / config.growthTargets.targetRatingImprovement) * 100, 100);
-  
+
   // Solved growth fallback estimation
   const finalSolvedGrowth = solvedGrowth > 0 ? solvedGrowth : activeDates.size * 2.5;
   const problemSolvingGrowthScore = Math.min((finalSolvedGrowth / config.growthTargets.targetSolvedImprovement) * 100, 100);
 
   const growthScore = Math.round(
-    0.50 * ratingImprovementScore + 
+    0.50 * ratingImprovementScore +
     0.50 * problemSolvingGrowthScore
   );
 
@@ -426,7 +428,7 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
 
   // Compile recommendations
   const recommendations = [];
-  
+
   // Recommend solving specific weakest concepts
   weakestTopics.forEach(topic => {
     const wt = config.topicWeights[topic] || 5;
@@ -508,7 +510,7 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
   // Line data (Readiness score history)
   const lineLabels = [];
   const lineDataPoints = [];
-  
+
   if (sortedHistory.length > 0 && !fetchedData.bypassHistory) {
     sortedHistory.forEach((pt, idx) => {
       // Simulate historical readiness score calculation
@@ -522,7 +524,7 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
         lcHard: Math.round(lcHard * ((idx + 1) / sortedHistory.length)),
         lcContests: Math.round(lcContests * ((idx + 1) / sortedHistory.length))
       };
-      
+
       const ratio = (idx + 1) / sortedHistory.length;
       const histResult = calculateInterviewReadiness(histUser, sortedHistory.slice(0, idx + 1), {
         bypassHistory: true,
@@ -581,6 +583,20 @@ function calculateInterviewReadiness(user, history = [], fetchedData = {}) {
       contestPerformance: contestPerformance
     },
     topicMastery: Object.fromEntries(sortedTopics.slice(0, 5)), // return top 5
+    topicsDetail: topics.map(topic => {
+      const counts = topicSolvedCounts[topic];
+      const mastery = topicMastery[topic];
+      const score = topicScores[topic];
+      return {
+        topic,
+        easy: counts.Easy,
+        medium: counts.Medium,
+        hard: counts.Hard,
+        total: counts.Easy + counts.Medium + counts.Hard,
+        mastery,
+        score
+      };
+    }),
     recommendations: topRecommendations,
     explanation,
     charts: {
